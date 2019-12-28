@@ -16,3 +16,9 @@ A simultaneous traffic on up to 8 different lines can be simulated. The simulati
 Sketch contains a ready configuration for different pulse rates (Strowger, Siemens, Ericsson) and decadic coding (standard, Swedish, New Zealand). Phone numbers are randomly selected from a given set.
 
 Arduino can be connected to an actual (inactive!) excahnge via relay shield/module. For research purposes only.
+
+## Rotary dial tester
+See `sketches/rotary_dial_tester.ino`
+For connection schema, see `schemas/rotary_dial_tester.fzz`
+
+Arduino sketch for testing and interpreting the pulses from a standard rotary dial (based on telephone model [Aster](http://telesfor99.org/download/schemat_Aster_Telcza.jpg)).
