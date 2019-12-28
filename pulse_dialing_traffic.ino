@@ -2,39 +2,43 @@
  * Simulation of 8 lines of telephone traffic comming to a pulse exchange.
  * Calls are made at random intervals
  *
- * Pawel Adamowicz, 2016
+ * Pawel Adamowicz, 2017
  */
 
-// used pins
-byte dataPin = 4;
-byte latchPin = 5;
-byte clockPin = 6;
-
 // time data for pulse sequences
-const int pulseTime = 100;      // single pulse time
-const int gapTime = 100;        // interval between pulses
-const int dialBreakTime = 300;  // interval between digit pulse sequences */
+// Strowger (actually it should be 33 1/3 to 66 2/3
+const int pulseTime = 33;      // single pulse time
+const int gapTime = 67;        // interval between pulses
+
+// Siemens
+// const int pulseTime = 37;      // single pulse time
+// const int gapTime = 63;        // interval between pulses
+
+// Ericsson
+// const int pulseTime = 42;      // single pulse time
+// const int gapTime = 58;        // interval between pulses
+
+const int dialBreakTime = 500; // interval between digit pulse sequences */
 
 const long minTimeBetweenCalls = 30000; // minimum interval between calls (maximum is twice this value)
 const long minCallDuration = 20000;     // minimum call duration (maximum is twice this value)
 
-const byte linesCount = 1;  // maximum is 8 for 8 shift regisetr outputs
-const byte occupiedLinesLimit = 4;
+const byte pinsShift = 6;   // number of first pin associated with telephone line
+const byte linesCount = 8;
+const byte occupiedLinesLimit = 6;
 byte occupiedLinesCnt;
 
-char* phoneNumbers[] = {"012","423","121","816","256","513","922","786","427","020","576","137","631","595","711","800"};
-//char* phoneNumbers[] = {"2114213","2114254","6331212","1234567","8901234","5563451","0801922","4392211"};
+// Sample numbers
+// 3 digit railway numbers
+//char* phoneNumbers[] = {"012","423","121","816","256","513","922","786","427","020","576","137","631","595","711","800"};
+// 6 digit town numbers
+char* phoneNumbers[] = {"114213","114254","331212","234567","901234","563451","801922","392211","851290","232461","224563","657865","525846","258469","486215","851256"};
 const byte availableNumbers = 16;
 
 // Number of pulses per digit
-const byte dialPattern[10] = {10,1,2,3,4,5,6,7,8,9}; // Generic Siemens model
+const byte dialPattern[10] = {10,1,2,3,4,5,6,7,8,9}; // Generic Siemens/Strowger model
 //byte dialPattern[10] = {1,2,3,4,5,6,7,8,9,10}; // Swedish model
-//byte dialPattern[10] = {10,9,8,7,6,5,4,3,2,1}; // Norwegian model
-
-byte outData = 0; // output for shift register
-
-//long lastCallTime;
-
+//byte dialPattern[10] = {10,9,8,7,6,5,4,3,2,1}; // New Zealand model
 
 enum LineState {FREE, DIALING_INIT, DIALING_PULSE, DIALING_GAP, DIALING_BREAK, OCCUPIED};
 
@@ -49,11 +53,13 @@ struct PhoneLine {
 
 
 void setup() {
-  pinMode(latchPin, OUTPUT);
-  pinMode(clockPin, OUTPUT);
-  pinMode(dataPin, OUTPUT);
   randomSeed(analogRead(0));
-  outData = 0;
+  for (int i = 0; i< linesCount; i++)
+  {
+    pinMode(i + pinsShift,OUTPUT);
+    digitalWrite(i + pinsShift,HIGH);
+  }
+
   occupiedLinesCnt = 0;
   for (int i = 0; i < linesCount; i++)
   {
@@ -70,7 +76,6 @@ void loop() {
   {
     checkLineState(i,millis());
   }
-  updateShiftRegister(outData);
 }
 
 void checkLineState(byte lineId, long currTime)
@@ -88,7 +93,7 @@ void checkLineState(byte lineId, long currTime)
           lines[lineId].lastEventTime = currTime;
           strcpy(lines[lineId].currentDial, phoneNumbers[phoneId]);
           //lastCallTime = currTime;
-          bitSet(outData,lineId);
+          digitalWrite(lineId + pinsShift,LOW);
           lines[lineId].digitId = 0;
           occupiedLinesCnt++;
           Serial.print("Connection initiated on line ");
@@ -102,7 +107,7 @@ void checkLineState(byte lineId, long currTime)
         lines[lineId].currentPulseCnt = dialPattern[lines[lineId].currentDial[lines[lineId].digitId] - '0'];
         lines[lineId].state = DIALING_PULSE;
         lines[lineId].lastEventTime = currTime;
-        bitClear(outData,lineId);
+        digitalWrite(lineId + pinsShift,HIGH);
         Serial.print("Started dialing ");
         Serial.print(lines[lineId].currentDial);
         Serial.print(" on line ");
@@ -119,7 +124,7 @@ void checkLineState(byte lineId, long currTime)
           {
             lines[lineId].state = OCCUPIED;
             lines[lineId].lastEventTime = currTime;
-            bitSet(outData,lineId);
+            digitalWrite(lineId + pinsShift,LOW);
             Serial.print("Dialing finished, occupied line ");
             Serial.println(lineId,DEC);
           }
@@ -128,14 +133,14 @@ void checkLineState(byte lineId, long currTime)
             lines[lineId].currentPulseCnt = dialPattern[lines[lineId].currentDial[lines[lineId].digitId] - '0'];
             lines[lineId].state = DIALING_BREAK;
             lines[lineId].lastEventTime = currTime;
-            bitSet(outData,lineId);
+            digitalWrite(lineId + pinsShift,LOW);
           }
         }
         else
         {
           lines[lineId].state = DIALING_GAP;
           lines[lineId].lastEventTime = currTime;
-          bitSet(outData,lineId);
+          digitalWrite(lineId + pinsShift,LOW);
         }
       }
     break;
@@ -144,7 +149,7 @@ void checkLineState(byte lineId, long currTime)
       {
           lines[lineId].state = DIALING_PULSE;
           lines[lineId].lastEventTime = currTime;
-          bitClear(outData,lineId);
+          digitalWrite(lineId + pinsShift,HIGH);
       }
     break;
     case DIALING_BREAK:
@@ -152,7 +157,7 @@ void checkLineState(byte lineId, long currTime)
       {
           lines[lineId].state = DIALING_PULSE;
           lines[lineId].lastEventTime = currTime;
-          bitClear(outData,lineId);
+          digitalWrite(lineId + pinsShift,HIGH);
       }
     break;
     case OCCUPIED:
@@ -162,7 +167,7 @@ void checkLineState(byte lineId, long currTime)
         lines[lineId].lastEventTime = currTime;
         lines[lineId].currentDial[0] = 0;
         occupiedLinesCnt--;
-        bitClear(outData,lineId);
+        digitalWrite(lineId + pinsShift,HIGH);
         Serial.print("Disconnecting line ");
         Serial.println(lineId,DEC);
       }
@@ -193,10 +198,3 @@ int chooseUnusedPhone()
     return -1;
 }
 
-
-void updateShiftRegister(byte value)
-{
-  digitalWrite(latchPin, LOW);
-  shiftOut(dataPin, clockPin, MSBFIRST, value);
-  digitalWrite(latchPin, HIGH);
-}
